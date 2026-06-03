@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>طلب توصيل - يلا ن</title>
+    <title>طلب توصيل - يلا نروح</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght=400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -39,7 +39,7 @@
         <div id="orderBox" class="order-box">
             <h2>طلب مندوب توصيل 📦</h2>
             <form id="orderForm">
-                <label>شنو الغرض المُراد توصيله؟</label><input type="text" id="itemDetails" placeholder="مثال: أوراق، هدايا..." required>
+                <label>شنو الغرض المُراد توصيله؟</label><input type="text" id="itemDetails" placeholder="مثال: أوراق, هدايا..." required>
                 <label>حدد موقع الاستلام والتسليم على الخريطة:</label>
                 <div style="font-size: 12px; color: #64748b; margin-bottom: 10px;" id="mapHint">📍 اضغط على الخريطة لتحديد (مكان الاستلام)</div>
                 <div id="map"></div>
@@ -61,7 +61,7 @@
 
         let map, pickupCoords = null, dropoffCoords = null, pickupMarker, dropoffMarker;
         let calculatedDistance = 0, calculatedPrice = 0, currentOrderId = null;
-        let backupCheckerInterval = null;
+        let statusInterval = null;
 
         window.onload = function() {
             if (localStorage.getItem('client_logged') === 'true') { showOrderInterface(); }
@@ -114,20 +114,29 @@
             document.getElementById('priceBox').style.display = 'block';
         }
 
-        async function checkStatusDirectly() {
+        // دالة الفحص الدورية البسيطة والمضمونة جداً 🏁
+        async function checkOrderStatus() {
             if (!currentOrderId) return;
-            const response = await supabaseClient.from('deliveries').select('*').eq('id', currentOrderId);
-            if (response.data && response.data[0]) {
+            
+            const response = await supabaseClient
+                .from('deliveries')
+                .select('*')
+                .eq('id', currentOrderId);
+
+            if (response.data && response.data.length > 0) {
                 const order = response.data[0];
-                if (order.status === 'تم القبول من المندوب') {
-                    if(backupCheckerInterval) clearInterval(backupCheckerInterval);
-                    document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك وباقي قليل ويوصلك!";
+                
+                // إذا تغيرت الحالة إلى أي شيء غير "قيد الانتظار" (يعني الكابتن وافق)
+                if (order.status !== 'قيد الانتظار') {
+                    clearInterval(statusInterval); // إيقاف التكرار فورا
+
+                    document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك بنجاح!";
                     document.getElementById('captainDetails').innerHTML = `
                         <div class="captain-info-card">
                             <h4>🏍️ معلومات المندوب المتجه إليك:</h4>
-                            <p><strong>👤 الاسم:</strong> ${order.captain_name || 'غير معروف'}</p>
-                            <p><strong>📞 الهاتف:</strong> <a href="tel:${order.captain_phone}">${order.captain_phone || 'لا يوجد'}</a></p>
-                            <p><strong>🛵 دراجة نوع:</strong> ${order.captain_bike || 'دراجة نارية'}</p>
+                            <p><strong>👤 الاسم:</strong> ${order.captain_name || 'كابتن يلا نروح'}</p>
+                            <p><strong>📞 الهاتف:</strong> <a href="tel:${order.captain_phone}">${order.captain_phone || 'غير متوفر'}</a></p>
+                            <p><strong>🛵 دراجة نوع:</strong> ${order.captain_bike || 'متوفرة'}</p>
                         </div>
                     `;
                 }
@@ -150,16 +159,16 @@
                 }
             ]).select();
 
-            if (insertResponse.error || !insertResponse.data) {
-                alert('حدث خطأ أثناء الإرسال');
+            if (insertResponse.error || !insertResponse.data || insertResponse.data.length === 0) {
+                alert('حدث خطأ أثناء إرسال الطلب');
                 document.getElementById('submitBtn').disabled = false;
             } else {
                 currentOrderId = insertResponse.data[0].id;
                 document.getElementById('orderBox').style.display = 'none';
                 document.getElementById('statusBox').style.display = 'block';
                 
-                // تشغيل الفحص المباشر والسريع كل ثانيتين بدون توقف وبطريقة مضمونة
-                backupCheckerInterval = setInterval(checkStatusDirectly, 2000);
+                // فحص حالة الطلب بالسيرفر كل ثانيتين بشكل مباشر ومستمر وبدون تعليق
+                statusInterval = setInterval(checkOrderStatus, 2000);
             }
         });
     </script>
