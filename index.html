@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>طلب توصيل - يلا نروح</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght=400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -13,21 +13,14 @@
         body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; margin: 0; padding: 15px; direction: rtl; }
         .container { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 450px; margin: 0 auto; }
         h2 { text-align: center; color: #4f46e5; font-weight: 700; font-size: 24px; margin-bottom: 20px; }
-        
-        /* شاشة دخول الزبون */
         .login-box { display: block; }
-        /* شاشة الطلب */
         .order-box { display: none; }
-        /* شاشة المتابعة الحية */
         .status-box { display: none; background: #fafafa; border: 2px dashed #4f46e5; padding: 15px; border-radius: 15px; margin-top: 15px; text-align: center; }
-
         label { font-weight: 600; color: #334155; display: block; margin-bottom: 8px; font-size: 14px; }
         input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1.5px solid #e2e8f0; border-radius: 12px; box-sizing: border-box; font-family: 'Cairo'; font-size: 14px; }
-        input:focus { outline: none; border-color: #4f46e5; }
         #map { height: 200px; border-radius: 12px; margin-bottom: 15px; border: 1.5px solid #e2e8f0; }
         .info-box { background: #f1f5f9; padding: 12px; border-radius: 12px; margin-bottom: 15px; text-align: center; font-weight: bold; color: #1e293b; font-size: 14px; display: none; }
         button { width: 100%; padding: 14px; background: #4f46e5; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: 'Cairo'; }
-        button:hover { background: #3730a3; }
         .captain-info-card { background: #ecfdf5; border: 1px solid #10b981; border-radius: 12px; padding: 15px; margin-top: 15px; text-align: right; }
         .captain-info-card h4 { margin: 0 0 10px 0; color: #065f46; }
         .status-text { font-size: 18px; font-weight: bold; color: #4f46e5; }
@@ -38,27 +31,19 @@
     <div class="container">
         <div id="loginBox" class="login-box">
             <h2>تسجيل سريع 📝</h2>
-            <label>الاسم الكامل</label>
-            <input type="text" id="clientName" placeholder="اكتب اسمك هنا">
-            <label>رقم الهاتف</label>
-            <input type="tel" id="clientPhone" placeholder="07XXXXXXXXX">
+            <label>الاسم الكامل</label><input type="text" id="clientName" placeholder="اكتب اسمك هنا">
+            <label>رقم الهاتف</label><input type="tel" id="clientPhone" placeholder="07XXXXXXXXX">
             <button onclick="saveClientLogin()">دخول للموقع</button>
         </div>
 
         <div id="orderBox" class="order-box">
             <h2>طلب مندوب توصيل 📦</h2>
             <form id="orderForm">
-                <label>شنو الغرض المُراد توصيله؟</label>
-                <input type="text" id="itemDetails" placeholder="مثال: أوراق، هدايا، ملابس..." required>
-
+                <label>شنو الغرض المُراد توصيله؟</label><input type="text" id="itemDetails" placeholder="مثال: أوراق، هدايا..." required>
                 <label>حدد موقع الاستلام والتسليم على الخريطة:</label>
                 <div style="font-size: 12px; color: #64748b; margin-bottom: 10px;" id="mapHint">📍 اضغط على الخريطة لتحديد (مكان الاستلام)</div>
                 <div id="map"></div>
-
-                <div class="info-box" id="priceBox">
-                    المسافة: <span id="distanceLabel">0</span> كم | الكروة: <span id="priceLabel">0</span> د.ع
-                </div>
-
+                <div class="info-box" id="priceBox">المسافة: <span id="distanceLabel">0</span> كم | الكروة: <span id="priceLabel">0</span> د.ع</div>
                 <button type="submit" id="submitBtn">تأكيد وأرسل للمناديب ⚡</button>
             </form>
         </div>
@@ -78,16 +63,13 @@
         let calculatedDistance = 0, calculatedPrice = 0, currentOrderId = null;
 
         window.onload = function() {
-            if (localStorage.getItem('client_logged') === 'true') {
-                showOrderInterface();
-            }
+            if (localStorage.getItem('client_logged') === 'true') { showOrderInterface(); }
         }
 
         function saveClientLogin() {
             const name = document.getElementById('clientName').value.trim();
             const phone = document.getElementById('clientPhone').value.trim();
             if(!name || !phone) { alert("الرجاء كتابة الاسم والرقم!"); return; }
-            
             localStorage.setItem('client_name', name);
             localStorage.setItem('client_phone', phone);
             localStorage.setItem('client_logged', 'true');
@@ -97,8 +79,6 @@
         function showOrderInterface() {
             document.getElementById('loginBox').style.display = 'none';
             document.getElementById('orderBox').style.display = 'block';
-            
-            // تشغيل الخريطة فوراً
             map = L.map('map').setView([33.4208, 43.3022], 13); 
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
@@ -126,9 +106,7 @@
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             calculatedDistance = (R * c).toFixed(1);
-
             calculatedPrice = calculatedDistance <= 3 ? 3000 : (calculatedDistance <= 7 ? 5000 : 7000);
-
             document.getElementById('distanceLabel').innerText = calculatedDistance;
             document.getElementById('priceLabel').innerText = calculatedPrice.toLocaleString();
             document.getElementById('priceBox').style.display = 'block';
@@ -137,23 +115,15 @@
         document.getElementById('orderForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!pickupCoords || !dropoffCoords) { alert("حدد المواقع على الخريطة!"); return; }
-
             document.getElementById('submitBtn').disabled = true;
-            const itemDetails = document.getElementById('itemDetails').value;
-
-            // جلب بيانات الزبون المخزنة بجهازه تلقائياً
-            const clName = localStorage.getItem('client_name');
-            const clPhone = localStorage.getItem('client_phone');
 
             const { data, error } = await supabaseClient.from('deliveries').insert([
                 { 
-                    item_details: itemDetails, 
+                    item_details: document.getElementById('itemDetails').value, 
                     pickup_location: `إحداثيات: ${pickupCoords[0].toFixed(4)}, ${pickupCoords[1].toFixed(4)}`, 
                     dropoff_location: `إحداثيات: ${dropoffCoords[0].toFixed(4)}, ${dropoffCoords[1].toFixed(4)}`,
-                    distance: calculatedDistance,
-                    price: calculatedPrice,
-                    client_name: clName,
-                    client_phone: clPhone,
+                    distance: calculatedDistance, price: calculatedPrice,
+                    client_name: localStorage.getItem('client_name'), client_phone: localStorage.getItem('client_phone'),
                     status: 'قيد الانتظار'
                 }
             ]).select();
@@ -165,33 +135,25 @@
                 currentOrderId = data[0].id;
                 document.getElementById('orderBox').style.display = 'none';
                 document.getElementById('statusBox').style.display = 'block';
-                // بدء فحص حالة الطلب حياً كل 4 ثوانٍ لمعرفة هل وافق كابتن أم لا
-                setInterval(trackLiveStatus, 4000);
+                
+                // الاستماع الفوري واللحظي لتحديث هذا الطلب بالذات بالـ Realtime 
+                supabaseClient.channel('track-order')
+                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'deliveries', filter: `id=eq.${currentOrderId}` }, (payload) => {
+                        const order = payload.new;
+                        if(order.status === 'تم القبول من المندوب') {
+                            document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك وباقي قليل ويوصلك!";
+                            document.getElementById('captainDetails').innerHTML = `
+                                <div class="captain-info-card">
+                                    <h4>🏍️ معلومات المندوب المتجه إليك:</h4>
+                                    <p><strong>👤 الاسم:</strong> ${order.captain_name}</p>
+                                    <p><strong>📞 الهاتف:</strong> <a href="tel:${order.captain_phone}">${order.captain_phone}</a></p>
+                                    <p><strong>🛵 دراجة نوع:</strong> ${order.captain_bike}</p>
+                                </div>
+                            `;
+                        }
+                    }).subscribe();
             }
         });
-
-        async function trackLiveStatus() {
-            if(!currentOrderId) return;
-            const { data, error } = await supabaseClient
-                .from('deliveries')
-                .select('*')
-                .eq('id', currentOrderId);
-
-            if(data && data[0]) {
-                const order = data[0];
-                if(order.status === 'تم القبول من المندوب') {
-                    document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك وباقي قليل ويوصلك!";
-                    document.getElementById('captainDetails').innerHTML = `
-                        <div class="captain-info-card">
-                            <h4>🏍️ معلومات المندوب المتجه إليك:</h4>
-                            <p><strong>👤 الاسم:</strong> ${order.captain_name}</p>
-                            <p><strong>📞 الهاتف:</strong> <a href="tel:${order.captain_phone}">${order.captain_phone}</a></p>
-                            <p><strong>🛵 دراجة نوع:</strong> ${order.captain_bike}</p>
-                        </div>
-                    `;
-                }
-            }
-        }
     </script>
 </body>
 </html>
