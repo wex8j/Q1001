@@ -3,83 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>توصيل أغراض - يلا نروح</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <title>طلب توصيل - يلا نروح</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <style>
-        /* تصميم الموقع */
-        body {
-            font-family: 'Cairo', sans-serif;
-            background-color: #f3f4f6;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-        .container {
-            background-color: #ffffff;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 400px;
-        }
-        h2 {
-            text-align: center;
-            color: #4f46e5;
-            margin-bottom: 25px;
-        }
-        label {
-            font-weight: bold;
-            margin-bottom: 8px;
-            display: block;
-            color: #374151;
-        }
-        input[type="text"] {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 20px;
-            border: 1px solid #d1d5db;
-            border-radius: 8px;
-            box-sizing: border-box;
-            font-family: 'Cairo', sans-serif;
-            font-size: 14px;
-        }
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #4f46e5;
-        }
-        button {
-            width: 100%;
-            padding: 14px;
-            background-color: #4f46e5;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.3s;
-            font-family: 'Cairo', sans-serif;
-        }
-        button:hover {
-            background-color: #4338ca;
-        }
-        button:disabled {
-            background-color: #9ca3af;
-            cursor: not-allowed;
-        }
-        #message {
-            text-align: center;
-            margin-top: 15px;
-            font-weight: bold;
-            font-size: 15px;
-        }
+        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; margin: 0; padding: 15px; direction: rtl; }
+        .container { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 450px; margin: 0 auto; }
+        h2 { text-align: center; color: #4f46e5; font-weight: 700; font-size: 24px; margin-bottom: 20px; }
+        label { font-weight: 600; color: #334155; display: block; margin-bottom: 8px; font-size: 14px; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1.5px solid #e2e8f0; border-radius: 12px; box-sizing: border-box; font-family: 'Cairo'; font-size: 14px; transition: 0.3s; }
+        input:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1); }
+        #map { height: 200px; border-radius: 12px; margin-bottom: 15px; border: 1.5px solid #e2e8f0; }
+        .info-box { background: #f1f5f9; padding: 12px; border-radius: 12px; margin-bottom: 15px; text-align: center; font-weight: bold; color: #1e293b; font-size: 14px; display: none; }
+        button { width: 100%; padding: 14px; background: #4f46e5; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; transition: 0.3s; font-family: 'Cairo'; }
+        button:hover { background: #3730a3; }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; }
+        #message { text-align: center; margin-top: 15px; font-weight: 700; }
         .success { color: #10b981; }
         .error { color: #ef4444; }
+        .step-hint { font-size: 12px; color: #64748b; margin-top: -10px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -87,72 +32,121 @@
     <div class="container">
         <h2>طلب مندوب توصيل 📦</h2>
         <form id="orderForm">
-            <label for="itemDetails">شنو الغرض الي تريد توصله؟</label>
-            <input type="text" id="itemDetails" placeholder="مثال: أوراق، هدية، ملابس..." required>
+            <label>شنو الغرض المُراد توصيله؟</label>
+            <input type="text" id="itemDetails" placeholder="مثال: أوراق، علبة هدايا، ملابس..." required>
 
-            <label for="pickupLocation">من وين نستلم الغرض؟</label>
-            <input type="text" id="pickupLocation" placeholder="مثال: الرمادي - شارع المستودع" required>
+            <label>حدد موقع الاستلام والتسليم على الخريطة:</label>
+            <div class="step-hint" id="mapHint">📍 اضغط على الخريطة لتحديد (مكان الاستلام)</div>
+            <div id="map"></div>
 
-            <label for="dropoffLocation">وين نوصله؟</label>
-            <input type="text" id="dropoffLocation" placeholder="مثال: الرمادي - التأميم" required>
+            <div class="info-box" id="priceBox">
+                المسافة: <span id="distanceLabel">0</span> كم | الكروة التقريبية: <span id="priceLabel">0</span> د.ع
+            </div>
 
-            <button type="submit" id="submitBtn">أطلب المندوب هسه</button>
+            <button type="submit" id="submitBtn">تأكيد الطلب الآن</button>
         </form>
         <div id="message"></div>
     </div>
 
     <script>
-        // 1. إعداد الاتصال بقاعدة بيانات Supabase الخاصة بك
         const supabaseUrl = 'https://swblfuyivvsrjulztyff.supabase.co';
         const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3YmxmdXlpdnZzcmp1bHp0eWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTQ4NTMsImV4cCI6MjA5NjA3MDg1M30.B_2lxLiEdIWSUGPlLblmi6ob8zBBAIwiOjl1Yb6RhLs';
-        
-        const { createClient } = supabase;
-        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-        // 2. برمجة زر الإرسال
+        // إعداد خريطة الرمادي كمركز افتراضي
+        const map = L.map('map').setView([33.4208, 43.3022], 13); 
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        let pickupCoords = null;
+        let dropoffCoords = null;
+        let pickupMarker, dropoffMarker;
+        let calculatedDistance = 0;
+        let calculatedPrice = 0;
+
+        // التقاط الضغطات على الخريطة لتحديد المواقع
+        map.on('click', function(e) {
+            const { lat, lng } = e.latlng;
+
+            if (!pickupCoords) {
+                pickupCoords = [lat, lng];
+                pickupMarker = L.marker(pickupCoords, {title: "الاستلام"}).addTo(map).bindPopup("📍 مكان الاستلام").openPopup();
+                document.getElementById('mapHint').innerText = "🏁 الآن اضغط لتحديد (مكان التوصيل)";
+            } else if (!dropoffCoords) {
+                dropoffCoords = [lat, lng];
+                dropoffMarker = L.marker(dropoffCoords, {title: "التوصيل"}).addTo(map).bindPopup("🏁 مكان التوصيل").openPopup();
+                document.getElementById('mapHint').innerText = "✅ تم تحديد المواقع بنجاح!";
+                
+                // حساب المسافة والكروة
+                calculateRoute();
+            }
+        });
+
+        function calculateRoute() {
+            // قانون حساب المسافة بين نقطتين (خط مستقيم)
+            const lat1 = pickupCoords[0], lon1 = pickupCoords[1];
+            const lat2 = dropoffCoords[0], lon2 = dropoffCoords[1];
+            const R = 6371; // نصف قطر الأرض بالكيلومترات
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            calculatedDistance = (R * c).toFixed(1); // المسافة بالكيلومتر
+
+            // حسبة الكروة بناءً على المسافة داخل الرمادي
+            if (calculatedDistance <= 3) {
+                calculatedPrice = 3000;
+            } else if (calculatedDistance > 3 && calculatedDistance <= 7) {
+                calculatedPrice = 5000;
+            } else {
+                calculatedPrice = 7000;
+            }
+
+            document.getElementById('distanceLabel').innerText = calculatedDistance;
+            document.getElementById('priceLabel').innerText = calculatedPrice.toLocaleString();
+            document.getElementById('priceBox').style.display = 'block';
+        }
+
         document.getElementById('orderForm').addEventListener('submit', async function(e) {
-            e.preventDefault(); // لمنع إعادة تحميل الصفحة عند الضغط
-            
+            e.preventDefault();
+            if (!pickupCoords || !dropoffCoords) {
+                alert("الرجاء تحديد موقع الاستلام والتسليم على الخريطة أولاً!");
+                return;
+            }
+
             const btn = document.getElementById('submitBtn');
             const msgBox = document.getElementById('message');
-            
-            // تعطيل الزر مؤقتاً لتجنب إرسال الطلب مرتين
-            btn.innerText = 'جاري إرسال الطلب...';
+            btn.innerText = 'جاري إرسال الطلب المستعجل...';
             btn.disabled = true;
-            msgBox.innerText = '';
 
-            // استخراج القيم من الحقول
             const itemDetails = document.getElementById('itemDetails').value;
-            const pickupLocation = document.getElementById('pickupLocation').value;
-            const dropoffLocation = document.getElementById('dropoffLocation').value;
 
-            // 3. إرسال البيانات إلى جدول deliveries
-            const { data, error } = await supabaseClient
-                .from('deliveries')
-                .insert([
-                    { 
-                        item_details: itemDetails, 
-                        pickup_location: pickupLocation, 
-                        dropoff_location: dropoffLocation,
-                        status: 'قيد الانتظار'
-                    }
-                ]);
+            const { error } = await supabaseClient.from('deliveries').insert([
+                { 
+                    item_details: itemDetails, 
+                    pickup_location: `إحداثيات: ${pickupCoords[0].toFixed(4)}, ${pickupCoords[1].toFixed(4)}`, 
+                    dropoff_location: `إحداثيات: ${dropoffCoords[0].toFixed(4)}, ${dropoffCoords[1].toFixed(4)}`,
+                    distance: calculatedDistance,
+                    price: calculatedPrice,
+                    status: 'قيد الانتظار'
+                }
+            ]);
 
             if (error) {
                 msgBox.className = 'error';
-                msgBox.innerText = 'حدث خطأ! تأكد من إنشاء جدول (deliveries) في Supabase.';
-                console.error('تفاصيل الخطأ:', error);
+                msgBox.innerText = 'حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.';
             } else {
                 msgBox.className = 'success';
-                msgBox.innerText = 'تم إرسال طلب التوصيل بنجاح! ✅';
-                document.getElementById('orderForm').reset(); // تصفير الحقول بعد الإرسال
+                msgBox.innerText = 'تم إرسال طلبك بنجاح! المندوب في الطريق إليك الآن ✅';
+                document.getElementById('orderForm').reset();
+                if(pickupMarker) map.removeLayer(pickupMarker);
+                if(dropoffMarker) map.removeLayer(dropoffMarker);
+                pickupCoords = null; dropoffCoords = null;
+                document.getElementById('priceBox').style.display = 'none';
+                document.getElementById('mapHint').innerText = "📍 اضغط على الخريطة لتحديد (مكان الاستلام)";
             }
-
-            // إعادة تفعيل الزر
-            btn.innerText = 'أطلب المندوب هسه';
+            btn.innerText = 'تأكيد الطلب الآن';
             btn.disabled = false;
         });
     </script>
-
 </body>
 </html>
