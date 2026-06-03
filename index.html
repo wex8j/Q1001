@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>توصيل أغراض - يلا نروح</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        /* تصميم الموقع */
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        h2 {
+            text-align: center;
+            color: #4f46e5;
+            margin-bottom: 25px;
+        }
+        label {
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: block;
+            color: #374151;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-family: 'Cairo', sans-serif;
+            font-size: 14px;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #4f46e5;
+        }
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-family: 'Cairo', sans-serif;
+        }
+        button:hover {
+            background-color: #4338ca;
+        }
+        button:disabled {
+            background-color: #9ca3af;
+            cursor: not-allowed;
+        }
+        #message {
+            text-align: center;
+            margin-top: 15px;
+            font-weight: bold;
+            font-size: 15px;
+        }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>طلب مندوب توصيل 📦</h2>
+        <form id="orderForm">
+            <label for="itemDetails">شنو الغرض الي تريد توصله؟</label>
+            <input type="text" id="itemDetails" placeholder="مثال: أوراق، هدية، ملابس..." required>
+
+            <label for="pickupLocation">من وين نستلم الغرض؟</label>
+            <input type="text" id="pickupLocation" placeholder="مثال: الرمادي - شارع المستودع" required>
+
+            <label for="dropoffLocation">وين نوصله؟</label>
+            <input type="text" id="dropoffLocation" placeholder="مثال: الرمادي - التأميم" required>
+
+            <button type="submit" id="submitBtn">أطلب المندوب هسه</button>
+        </form>
+        <div id="message"></div>
+    </div>
+
+    <script>
+        // 1. إعداد الاتصال بقاعدة بيانات Supabase الخاصة بك
+        const supabaseUrl = 'https://swblfuyivvsrjulztyff.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3YmxmdXlpdnZzcmp1bHp0eWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTQ4NTMsImV4cCI6MjA5NjA3MDg1M30.B_2lxLiEdIWSUGPlLblmi6ob8zBBAIwiOjl1Yb6RhLs';
+        
+        const { createClient } = supabase;
+        const supabaseClient = createClient(supabaseUrl, supabaseKey);
+
+        // 2. برمجة زر الإرسال
+        document.getElementById('orderForm').addEventListener('submit', async function(e) {
+            e.preventDefault(); // لمنع إعادة تحميل الصفحة عند الضغط
+            
+            const btn = document.getElementById('submitBtn');
+            const msgBox = document.getElementById('message');
+            
+            // تعطيل الزر مؤقتاً لتجنب إرسال الطلب مرتين
+            btn.innerText = 'جاري إرسال الطلب...';
+            btn.disabled = true;
+            msgBox.innerText = '';
+
+            // استخراج القيم من الحقول
+            const itemDetails = document.getElementById('itemDetails').value;
+            const pickupLocation = document.getElementById('pickupLocation').value;
+            const dropoffLocation = document.getElementById('dropoffLocation').value;
+
+            // 3. إرسال البيانات إلى جدول deliveries
+            const { data, error } = await supabaseClient
+                .from('deliveries')
+                .insert([
+                    { 
+                        item_details: itemDetails, 
+                        pickup_location: pickupLocation, 
+                        dropoff_location: dropoffLocation,
+                        status: 'قيد الانتظار'
+                    }
+                ]);
+
+            if (error) {
+                msgBox.className = 'error';
+                msgBox.innerText = 'حدث خطأ! تأكد من إنشاء جدول (deliveries) في Supabase.';
+                console.error('تفاصيل الخطأ:', error);
+            } else {
+                msgBox.className = 'success';
+                msgBox.innerText = 'تم إرسال طلب التوصيل بنجاح! ✅';
+                document.getElementById('orderForm').reset(); // تصفير الحقول بعد الإرسال
+            }
+
+            // إعادة تفعيل الزر
+            btn.innerText = 'أطلب المندوب هسه';
+            btn.disabled = false;
+        });
+    </script>
+
+</body>
+</html>
