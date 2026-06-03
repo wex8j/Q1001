@@ -136,22 +136,27 @@
                 document.getElementById('orderBox').style.display = 'none';
                 document.getElementById('statusBox').style.display = 'block';
                 
-                // الاستماع الفوري واللحظي لتحديث هذا الطلب بالذات بالـ Realtime 
-                supabaseClient.channel('track-order')
-                    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'deliveries', filter: `id=eq.${currentOrderId}` }, (payload) => {
-                        const order = payload.new;
-                        if(order.status === 'تم القبول من المندوب') {
-                            document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك وباقي قليل ويوصلك!";
-                            document.getElementById('captainDetails').innerHTML = `
-                                <div class="captain-info-card">
-                                    <h4>🏍️ معلومات المندوب المتجه إليك:</h4>
-                                    <p><strong>👤 الاسم:</strong> ${order.captain_name}</p>
-                                    <p><strong>📞 الهاتف:</strong> <a href="tel:${order.captain_phone}">${order.captain_phone}</a></p>
-                                    <p><strong>🛵 دراجة نوع:</strong> ${order.captain_bike}</p>
-                                </div>
-                            `;
+                // قناة بث مباشر قوية ومصححة للاستماع لأي تعديل يطرأ على الطلب بالثانية
+                supabaseClient
+                    .channel('track-order-channel')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'deliveries' }, (payload) => {
+                        // التأكد من أن التحديث يخص نفس طلب الزبون الحالي
+                        if (payload.new && payload.new.id === currentOrderId) {
+                            const order = payload.new;
+                            if (order.status === 'تم القبول من المندوب') {
+                                document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك وباقي قليل ويوصلك!";
+                                document.getElementById('captainDetails').innerHTML = `
+                                    <div class="captain-info-card">
+                                        <h4>🏍️ معلومات المندوب المتجه إليك:</h4>
+                                        <p><strong>👤 الاسم:</strong> ${order.captain_name || 'غير معروف'}</p>
+                                        <p><strong>📞 الهاتف:</strong> <a href="tel:${order.captain_phone}">${order.captain_phone || 'لا يوجد'}</a></p>
+                                        <p><strong>🛵 دراجة نوع:</strong> ${order.captain_bike || 'دراجة نارية'}</p>
+                                    </div>
+                                `;
+                            }
                         }
-                    }).subscribe();
+                    })
+                    .subscribe();
             }
         });
     </script>
