@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>طلب توصيل - يلا نروح</title>
+    <title>طلب توصيل - </title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght=400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -114,21 +114,33 @@
             document.getElementById('priceBox').style.display = 'block';
         }
 
-        // دالة الفحص الدورية البسيطة والمضمونة جداً 🏁
+        // دالة الفحص الفائقة والمعدلة جذاً
         async function checkOrderStatus() {
-            if (!currentOrderId) return;
+            if (!currentOrderId) {
+                console.log("خطأ: لا يوجد معرف طلب حالي للفحص!");
+                return;
+            }
+            
+            console.log("جاري فحص حالة الطلب رقم: " + currentOrderId);
             
             const response = await supabaseClient
                 .from('deliveries')
                 .select('*')
                 .eq('id', currentOrderId);
 
+            if (response.error) {
+                console.log("خطأ أثناء جلب البيانات من السيرفر:", response.error);
+                return;
+            }
+
             if (response.data && response.data.length > 0) {
                 const order = response.data[0];
+                console.log("الحالة الحالية في السيرفر هي: " + order.status);
                 
-                // إذا تغيرت الحالة إلى أي شيء غير "قيد الانتظار" (يعني الكابتن وافق)
-                if (order.status !== 'قيد الانتظار') {
-                    clearInterval(statusInterval); // إيقاف التكرار فورا
+                // التعديل الذكي: نتحقق إذا تغيرت الحالة عن كلمة 'قيد الانتظار'
+                if (order.status && order.status !== 'قيد الانتظار') {
+                    console.log("تم اكتشاف قبول الطلب! جاري إيقاف الفحص وتحديث الشاشة.");
+                    clearInterval(statusInterval); 
 
                     document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك بنجاح!";
                     document.getElementById('captainDetails').innerHTML = `
@@ -140,6 +152,8 @@
                         </div>
                     `;
                 }
+            } else {
+                console.log("تحذير: لم يتم العثور على الطلب في السيرفر، قد يكون الـ ID غير صحيح.");
             }
         }
 
@@ -147,6 +161,8 @@
             e.preventDefault();
             if (!pickupCoords || !dropoffCoords) { alert("حدد المواقع على الخريطة!"); return; }
             document.getElementById('submitBtn').disabled = true;
+
+            console.log("جاري إرسال الطلب الجديد إلى السيرفر...");
 
             const insertResponse = await supabaseClient.from('deliveries').insert([
                 { 
@@ -160,14 +176,21 @@
             ]).select();
 
             if (insertResponse.error || !insertResponse.data || insertResponse.data.length === 0) {
+                console.log("فشل إرسال الطلب:", insertResponse.error);
                 alert('حدث خطأ أثناء إرسال الطلب');
                 document.getElementById('submitBtn').disabled = false;
             } else {
-                currentOrderId = insertResponse.data[0].id;
+                // حفظ الـ ID بشكل صارم وصحيح
+                const savedOrder = insertResponse.data[0];
+                currentOrderId = savedOrder.id || savedOrder.Id; 
+                
+                console.log("تم حفظ الطلب بنجاح. المعرف المستلم هو: " + currentOrderId);
+                
                 document.getElementById('orderBox').style.display = 'none';
                 document.getElementById('statusBox').style.display = 'block';
                 
-                // فحص حالة الطلب بالسيرفر كل ثانيتين بشكل مباشر ومستمر وبدون تعليق
+                // تشغيل الفحص التلقائي المباشر كل ثانيتين
+                if(statusInterval) clearInterval(statusInterval);
                 statusInterval = setInterval(checkOrderStatus, 2000);
             }
         });
