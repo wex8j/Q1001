@@ -101,7 +101,7 @@
                 <div class="chat-hdr"><span class="live-dot"></span>محادثة مع المندوب 💬</div>
                 <div id="chatMsgs"><span style="color:#94a3b8;font-size:13px;text-align:center;display:block;margin:auto;">لا توجد رسائل بعد...</span></div>
                 <div class="chat-footer">
-                    <button class="send-btn" onclick="sendMsg()">➤</button>
+                    <button type="button" class="send-btn" onclick="sendMsg()">➤</button>
                     <input type="text" id="chatInput" placeholder="اكتب رسالة للمندوب..." onkeydown="if(event.key==='Enter')sendMsg()">
                 </div>
             </div>
@@ -118,6 +118,7 @@ let map,pickupC=null,dropoffC=null;
 let dist=0,price=0,orderId=null;
 let backupTimer=null,lastMsgId=0;
 let chatStarted=false;
+let shownMsgIds=new Set();
 
 window.onload=function(){
     if(localStorage.getItem('client_logged')==='true') showOrderForm();
@@ -204,6 +205,8 @@ async function checkStatus(){
 }
 
 function appendMsg(msg){
+    if(shownMsgIds.has(msg.id)) return;
+    shownMsgIds.add(msg.id);
     const box=document.getElementById('chatMsgs');
     const empty=box.querySelector('span');
     if(empty) empty.remove();
@@ -213,7 +216,6 @@ function appendMsg(msg){
     d.innerHTML=`${msg.message}<div class="t">${ftime(msg.created_at)}</div>`;
     box.appendChild(d);
     box.scrollTop=box.scrollHeight;
-    if(msg.id>lastMsgId) lastMsgId=msg.id;
 }
 
 async function startChat(){
@@ -221,7 +223,7 @@ async function startChat(){
     if(data) data.forEach(appendMsg);
     sc.channel('cli-chat-'+orderId)
         .on('postgres_changes',{event:'INSERT',schema:'public',table:'chat_messages',filter:`order_id=eq.${orderId}`},(p)=>{
-            if(p.new.id!==lastMsgId) appendMsg(p.new);
+        if(p.new.id!==lastMsgId) appendMsg(p.new);
         }).subscribe();
 }
 
