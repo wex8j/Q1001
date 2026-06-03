@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>طلب توصيل - </title>
+    <title>طلب توصيل - يلا نروح</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght=400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -24,6 +24,9 @@
         .captain-info-card { background: #ecfdf5; border: 1px solid #10b981; border-radius: 12px; padding: 15px; margin-top: 15px; text-align: right; }
         .captain-info-card h4 { margin: 0 0 10px 0; color: #065f46; }
         .status-text { font-size: 18px; font-weight: bold; color: #4f46e5; }
+        
+        /* صندوق كشف الأخطاء السري */
+        .debug-panel { background: #fef2f2; border: 2px solid #ef4444; color: #991b1b; padding: 15px; border-radius: 12px; margin-top: 20px; font-size: 12px; text-align: left; direction: ltr; font-family: monospace; overflow-x: auto; }
     </style>
 </head>
 <body>
@@ -39,7 +42,7 @@
         <div id="orderBox" class="order-box">
             <h2>طلب مندوب توصيل 📦</h2>
             <form id="orderForm">
-                <label>شنو الغرض المُراد توصيله؟</label><input type="text" id="itemDetails" placeholder="مثال: أوراق, هدايا..." required>
+                <label>شنو الغرض المُراد توصيله?</label><input type="text" id="itemDetails" placeholder="مثال: أوراق, هدايا..." required>
                 <label>حدد موقع الاستلام والتسليم على الخريطة:</label>
                 <div style="font-size: 12px; color: #64748b; margin-bottom: 10px;" id="mapHint">📍 اضغط على الخريطة لتحديد (مكان الاستلام)</div>
                 <div id="map"></div>
@@ -52,6 +55,11 @@
             <p class="status-text" id="statusMessage">🔄 جاري البحث عن أقرب مندوب بدراجة...</p>
             <div id="captainDetails"></div>
         </div>
+
+        <div class="debug-panel">
+            <div style="font-weight: bold; margin-bottom: 5px; text-align: right; direction: rtl;">🛠️ تقرير الاتصال بالسيرفر (Debug):</div>
+            <div id="debugStatus">الوضع: مستعد لإرسال الطلب الأول...</div>
+        </div>
     </div>
 
     <script>
@@ -62,6 +70,10 @@
         let map, pickupCoords = null, dropoffCoords = null, pickupMarker, dropoffMarker;
         let calculatedDistance = 0, calculatedPrice = 0, currentOrderId = null;
         let statusInterval = null;
+
+        function logDebug(msg) {
+            document.getElementById('debugStatus').innerHTML += "<br>⏱️ " + new Date().toLocaleTimeString() + " -> " + msg;
+        }
 
         window.onload = function() {
             if (localStorage.getItem('client_logged') === 'true') { showOrderInterface(); }
@@ -114,14 +126,8 @@
             document.getElementById('priceBox').style.display = 'block';
         }
 
-        // دالة الفحص الفائقة والمعدلة جذاً
         async function checkOrderStatus() {
-            if (!currentOrderId) {
-                console.log("خطأ: لا يوجد معرف طلب حالي للفحص!");
-                return;
-            }
-            
-            console.log("جاري فحص حالة الطلب رقم: " + currentOrderId);
+            if (!currentOrderId) return;
             
             const response = await supabaseClient
                 .from('deliveries')
@@ -129,19 +135,16 @@
                 .eq('id', currentOrderId);
 
             if (response.error) {
-                console.log("خطأ أثناء جلب البيانات من السيرفر:", response.error);
+                logDebug("Error during Polling: " + response.error.message);
                 return;
             }
 
             if (response.data && response.data.length > 0) {
                 const order = response.data[0];
-                console.log("الحالة الحالية في السيرفر هي: " + order.status);
+                logDebug("Current Status on DB: " + order.status);
                 
-                // التعديل الذكي: نتحقق إذا تغيرت الحالة عن كلمة 'قيد الانتظار'
                 if (order.status && order.status !== 'قيد الانتظار') {
-                    console.log("تم اكتشاف قبول الطلب! جاري إيقاف الفحص وتحديث الشاشة.");
                     clearInterval(statusInterval); 
-
                     document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك بنجاح!";
                     document.getElementById('captainDetails').innerHTML = `
                         <div class="captain-info-card">
@@ -152,8 +155,6 @@
                         </div>
                     `;
                 }
-            } else {
-                console.log("تحذير: لم يتم العثور على الطلب في السيرفر، قد يكون الـ ID غير صحيح.");
             }
         }
 
@@ -162,7 +163,7 @@
             if (!pickupCoords || !dropoffCoords) { alert("حدد المواقع على الخريطة!"); return; }
             document.getElementById('submitBtn').disabled = true;
 
-            console.log("جاري إرسال الطلب الجديد إلى السيرفر...");
+            logDebug("Sending request to Supabase...");
 
             const insertResponse = await supabaseClient.from('deliveries').insert([
                 { 
@@ -175,24 +176,30 @@
                 }
             ]).select();
 
-            if (insertResponse.error || !insertResponse.data || insertResponse.data.length === 0) {
-                console.log("فشل إرسال الطلب:", insertResponse.error);
-                alert('حدث خطأ أثناء إرسال الطلب');
+            // فحص الخطأ بالتفصيل الممل
+            if (insertResponse.error) {
+                logDebug("🚨 CRITICAL ERROR: " + insertResponse.error.message);
+                alert('فشل الاتصال: ' + insertResponse.error.message);
                 document.getElementById('submitBtn').disabled = false;
-            } else {
-                // حفظ الـ ID بشكل صارم وصحيح
-                const savedOrder = insertResponse.data[0];
-                currentOrderId = savedOrder.id || savedOrder.Id; 
-                
-                console.log("تم حفظ الطلب بنجاح. المعرف المستلم هو: " + currentOrderId);
-                
-                document.getElementById('orderBox').style.display = 'none';
-                document.getElementById('statusBox').style.display = 'block';
-                
-                // تشغيل الفحص التلقائي المباشر كل ثانيتين
-                if(statusInterval) clearInterval(statusInterval);
-                statusInterval = setInterval(checkOrderStatus, 2000);
+                return;
             }
+
+            if (!insertResponse.data || insertResponse.data.length === 0) {
+                logDebug("🚨 Server returned empty data (No Row Created!)");
+                alert('لم يتم إنشاء طلب بالسيرفر! تأكد من صلاحيات الـ RLS');
+                document.getElementById('submitBtn').disabled = false;
+                return;
+            }
+
+            const savedOrder = insertResponse.data[0];
+            currentOrderId = savedOrder.id || savedOrder.Id; 
+            
+            logDebug("🚀 SUCCESS! Order ID created: " + currentOrderId);
+            
+            document.getElementById('orderBox').style.display = 'none';
+            document.getElementById('statusBox').style.display = 'block';
+            
+            statusInterval = setInterval(checkOrderStatus, 2000);
         });
     </script>
 </body>
