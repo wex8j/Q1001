@@ -61,6 +61,7 @@
 
         let map, pickupCoords = null, dropoffCoords = null, pickupMarker, dropoffMarker;
         let calculatedDistance = 0, calculatedPrice = 0, currentOrderId = null;
+        let backupCheckerInterval = null; // مؤقت الفحص البديل
 
         window.onload = function() {
             if (localStorage.getItem('client_logged') === 'true') { showOrderInterface(); }
@@ -112,6 +113,38 @@
             document.getElementById('priceBox').style.display = 'block';
         }
 
+        // دالة مركزية لتحديث الواجهة أول ما يتم قبول الطلب
+        function updateInterfaceWithCaptain(order) {
+            if (order.status === 'تم القبول من المندوب') {
+                // إيقاف مؤقت الفحص البديل فوراً لتوفير البيانات والبطارية
+                if(backupCheckerInterval) clearInterval(backupCheckerInterval);
+
+                document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك وباقي قليل ويوصلك!";
+                document.getElementById('captainDetails').innerHTML = `
+                    <div class="captain-info-card">
+                        <h4>🏍️ معلومات المندوب المتجه إليك:</h4>
+                        <p><strong>👤 الاسم:</strong> ${order.captain_name || 'غير معروف'}</p>
+                        <p><strong>📞 الهاتف:</strong> <a href="tel:${order.captain_phone}">${order.captain_phone || 'لا يوجد'}</a></p>
+                        <p><strong>🛵 دراجة نوع:</strong> ${order.captain_bike || 'دراجة نارية'}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // دالة الفحص البديلة الصارمة لضمان قراءة السيرفر مباشرة
+        async function checkStatusDirectly() {
+            if (!currentOrderId) return;
+            const { data, error } = await supabaseClient
+                .from('deliveries')
+                .select('*')
+                .eq('id', currentOrderId)
+                .single();
+            
+            if (data) {
+                updateInterfaceWithCaptain(data);
+            }
+        }
+
         document.getElementById('orderForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (!pickupCoords || !dropoffCoords) { alert("حدد المواقع على الخريطة!"); return; }
@@ -136,24 +169,15 @@
                 document.getElementById('orderBox').style.display = 'none';
                 document.getElementById('statusBox').style.display = 'block';
                 
-                // قناة بث مباشر قوية ومصححة للاستماع لأي تعديل يطرأ على الطلب بالثانية
+                // 1. تشغيل الفحص التلقائي الصارم كل ثانيتين (الحل المضمون 100%)
+                backupCheckerInterval = setInterval(checkStatusDirectly, 2000);
+
+                // 2. البث المباشر (كقناة أساسية متزامنة)
                 supabaseClient
                     .channel('track-order-channel')
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'deliveries' }, (payload) => {
-                        // التأكد من أن التحديث يخص نفس طلب الزبون الحالي
                         if (payload.new && payload.new.id === currentOrderId) {
-                            const order = payload.new;
-                            if (order.status === 'تم القبول من المندوب') {
-                                document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك وباقي قليل ويوصلك!";
-                                document.getElementById('captainDetails').innerHTML = `
-                                    <div class="captain-info-card">
-                                        <h4>🏍️ معلومات المندوب المتجه إليك:</h4>
-                                        <p><strong>👤 الاسم:</strong> ${order.captain_name || 'غير معروف'}</p>
-                                        <p><strong>📞 الهاتف:</strong> <a href="tel:${order.captain_phone}">${order.captain_phone || 'لا يوجد'}</a></p>
-                                        <p><strong>🛵 دراجة نوع:</strong> ${order.captain_bike || 'دراجة نارية'}</p>
-                                    </div>
-                                `;
-                            }
+                            updateInterfaceWithCaptain(payload.new);
                         }
                     })
                     .subscribe();
