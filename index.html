@@ -3,43 +3,283 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>يلا نروح - الزبون</title>
+    <title>طلب توصيل - يلا نروح</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
     <style>
-        body { font-family: sans-serif; background: #f8fafc; padding: 20px; }
-        .container { max-width: 450px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        .chat-box { border-top: 1px solid #ddd; margin-top: 20px; padding-top: 10px; }
-        #chatMessages { height: 150px; overflow-y: scroll; border: 1px solid #eee; margin-bottom: 10px; padding: 5px; }
+        * { box-sizing: border-box; }
+        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; margin: 0; padding: 15px; direction: rtl; }
+        .container { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 450px; margin: 0 auto; }
+        h2 { text-align: center; color: #4f46e5; font-weight: 700; font-size: 24px; margin-bottom: 20px; }
+        label { font-weight: 600; color: #334155; display: block; margin-bottom: 8px; font-size: 14px; }
+        input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1.5px solid #e2e8f0; border-radius: 12px; font-family: 'Cairo'; font-size: 14px; outline: none; transition: border 0.2s; }
+        input:focus { border-color: #4f46e5; }
+        #map { height: 200px; border-radius: 12px; margin-bottom: 15px; border: 1.5px solid #e2e8f0; }
+        .info-box { background: #f1f5f9; padding: 12px; border-radius: 12px; margin-bottom: 15px; text-align: center; font-weight: bold; color: #1e293b; font-size: 14px; display: none; }
+        button.main-btn { width: 100%; padding: 14px; background: #4f46e5; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: 'Cairo'; transition: opacity 0.2s; }
+        button.main-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .status-box { display: none; background: #fafafa; border: 2px dashed #4f46e5; padding: 15px; border-radius: 15px; margin-top: 15px; text-align: center; }
+        .status-text { font-size: 18px; font-weight: bold; color: #4f46e5; }
+        .captain-info-card { background: #ecfdf5; border: 1px solid #10b981; border-radius: 12px; padding: 15px; margin-top: 15px; text-align: right; }
+        .captain-info-card h4 { margin: 0 0 10px 0; color: #065f46; }
+        .captain-info-card p { margin: 6px 0; font-size: 14px; }
+
+        /* ========== نظام المحادثة ========== */
+        #chatSection { display: none; margin-top: 20px; border: 1.5px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
+        .chat-header { background: #4f46e5; color: white; padding: 12px 15px; font-weight: 700; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+        .chat-header .dot { width: 10px; height: 10px; background: #4ade80; border-radius: 50%; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+        #chatMessages { height: 220px; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: #f8fafc; }
+        .msg { max-width: 80%; padding: 9px 13px; border-radius: 16px; font-size: 13px; line-height: 1.5; word-break: break-word; }
+        .msg.me { background: #4f46e5; color: white; align-self: flex-start; border-bottom-right-radius: 4px; }
+        .msg.them { background: white; color: #1e293b; align-self: flex-end; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; }
+        .msg .time { font-size: 10px; opacity: 0.65; margin-top: 3px; }
+        .chat-input-row { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #e2e8f0; background: white; }
+        .chat-input-row input { margin: 0; flex: 1; padding: 10px 12px; font-size: 13px; border-radius: 20px; }
+        .chat-input-row button { width: auto; padding: 10px 16px; border-radius: 20px; background: #4f46e5; color: white; border: none; font-family: 'Cairo'; font-weight: 700; cursor: pointer; font-size: 18px; flex-shrink: 0; }
+        #noMsgs { color: #94a3b8; font-size: 13px; text-align: center; margin: auto; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h2>حالة طلبك 📦</h2>
-        <div id="statusArea"></div>
-        
-        <div id="chatBox" class="chat-box" style="display:none;">
-            <h4>محادثة المندوب:</h4>
-            <div id="chatMessages"></div>
-            <input type="text" id="msgInput" style="width:70%">
-            <button onclick="sendMsg()">إرسال</button>
+
+<div class="container">
+
+    <!-- شاشة الدخول -->
+    <div id="loginBox">
+        <h2>تسجيل سريع 📝</h2>
+        <label>الاسم الكامل</label>
+        <input type="text" id="clientName" placeholder="اكتب اسمك هنا">
+        <label>رقم الهاتف</label>
+        <input type="tel" id="clientPhone" placeholder="07XXXXXXXXX">
+        <button class="main-btn" onclick="saveClientLogin()">دخول للموقع</button>
+    </div>
+
+    <!-- شاشة الطلب -->
+    <div id="orderBox" style="display:none;">
+        <h2>طلب مندوب توصيل 📦</h2>
+        <form id="orderForm">
+            <label>شنو الغرض المُراد توصيله؟</label>
+            <input type="text" id="itemDetails" placeholder="مثال: أوراق، هدايا..." required>
+            <label>حدد موقع الاستلام والتسليم على الخريطة:</label>
+            <div style="font-size:12px;color:#64748b;margin-bottom:10px;" id="mapHint">📍 اضغط على الخريطة لتحديد (مكان الاستلام)</div>
+            <div id="map"></div>
+            <div class="info-box" id="priceBox">المسافة: <span id="distanceLabel">0</span> كم | الكروة: <span id="priceLabel">0</span> د.ع</div>
+            <button class="main-btn" type="submit" id="submitBtn">تأكيد وأرسل للمناديب ⚡</button>
+        </form>
+    </div>
+
+    <!-- شاشة تتبع الطلب -->
+    <div id="statusBox" class="status-box">
+        <p class="status-text" id="statusMessage">🔄 جاري البحث عن أقرب مندوب بدراجة...</p>
+        <div id="captainDetails"></div>
+
+        <!-- قسم المحادثة المباشرة -->
+        <div id="chatSection">
+            <div class="chat-header">
+                <span class="dot"></span>
+                محادثة مع المندوب 💬
+            </div>
+            <div id="chatMessages">
+                <span id="noMsgs">لا توجد رسائل بعد...</span>
+            </div>
+            <div class="chat-input-row">
+                <button onclick="sendMessage()">➤</button>
+                <input type="text" id="chatInput" placeholder="اكتب رسالة للمندوب..." onkeydown="if(event.key==='Enter') sendMessage()">
+            </div>
         </div>
     </div>
 
-    <script>
-        const supabase = supabase.createClient('YOUR_URL', 'YOUR_KEY');
-        let currentOrderId = localStorage.getItem('last_order_id');
+</div>
 
-        // دالة إرسال الرسالة
-        async function sendMsg() {
-            const msg = document.getElementById('msgInput').value;
-            await supabase.from('messages').insert({ order_id: currentOrderId, sender: 'Client', message: msg });
-            document.getElementById('msgInput').value = '';
+<script>
+    const supabaseUrl = 'https://swblfuyivvsrjulztyff.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3YmxmdXlpdnZzcmp1bHp0eWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTQ4NTMsImV4cCI6MjA5NjA3MDg1M30.B_2lxLiEdIWSUGPlLblmi6ob8zBBAIwiOjl1Yb6RhLs';
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+    let map, pickupCoords = null, dropoffCoords = null;
+    let calculatedDistance = 0, calculatedPrice = 0;
+    let currentOrderId = null;
+    let backupCheckerInterval = null;
+    let lastMsgId = 0;
+
+    window.onload = function() {
+        if (localStorage.getItem('client_logged') === 'true') showOrderInterface();
+    }
+
+    function saveClientLogin() {
+        const name = document.getElementById('clientName').value.trim();
+        const phone = document.getElementById('clientPhone').value.trim();
+        if (!name || !phone) { alert("الرجاء كتابة الاسم والرقم!"); return; }
+        localStorage.setItem('client_name', name);
+        localStorage.setItem('client_phone', phone);
+        localStorage.setItem('client_logged', 'true');
+        showOrderInterface();
+    }
+
+    function showOrderInterface() {
+        document.getElementById('loginBox').style.display = 'none';
+        document.getElementById('orderBox').style.display = 'block';
+        map = L.map('map').setView([33.4208, 43.3022], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        map.on('click', function(e) {
+            const { lat, lng } = e.latlng;
+            if (!pickupCoords) {
+                pickupCoords = [lat, lng];
+                L.marker(pickupCoords).addTo(map).bindPopup("📍 مكان الاستلام").openPopup();
+                document.getElementById('mapHint').innerText = "🏁 الآن اضغط لتحديد (مكان التوصيل)";
+            } else if (!dropoffCoords) {
+                dropoffCoords = [lat, lng];
+                L.marker(dropoffCoords).addTo(map).bindPopup("🏁 مكان التوصيل").openPopup();
+                document.getElementById('mapHint').innerText = "✅ تم تحديد المواقع!";
+                calculateRoute();
+            }
+        });
+    }
+
+    function calculateRoute() {
+        const [lat1, lon1] = pickupCoords, [lat2, lon2] = dropoffCoords;
+        const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+        calculatedDistance = (R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))).toFixed(1);
+        calculatedPrice = calculatedDistance <= 3 ? 3000 : calculatedDistance <= 7 ? 5000 : 7000;
+        document.getElementById('distanceLabel').innerText = calculatedDistance;
+        document.getElementById('priceLabel').innerText = calculatedPrice.toLocaleString();
+        document.getElementById('priceBox').style.display = 'block';
+    }
+
+    function updateInterfaceWithCaptain(order) {
+        if (order.status === 'تم القبول من المندوب') {
+            if (backupCheckerInterval) clearInterval(backupCheckerInterval);
+            document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك وباقي قليل ويوصلك!";
+            document.getElementById('captainDetails').innerHTML = `
+                <div class="captain-info-card">
+                    <h4>🏍️ معلومات المندوب المتجه إليك:</h4>
+                    <p><strong>👤 الاسم:</strong> ${order.captain_name || 'غير معروف'}</p>
+                    <p><strong>📞 الهاتف:</strong> <a href="tel:${order.captain_phone}">${order.captain_phone || 'لا يوجد'}</a></p>
+                    <p><strong>🛵 دراجة نوع:</strong> ${order.captain_bike || 'دراجة نارية'}</p>
+                </div>
+            `;
+            // فتح المحادثة بعد قبول الطلب
+            document.getElementById('chatSection').style.display = 'block';
+            startChatListener();
         }
+    }
 
-        // تحديث الرسائل لحظياً
-        supabase.channel('room').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-            document.getElementById('chatMessages').innerHTML += `<div>${payload.new.sender}: ${payload.new.message}</div>`;
-        }).subscribe();
-    </script>
+    async function checkStatusDirectly() {
+        if (!currentOrderId) return;
+        const { data } = await supabaseClient.from('deliveries').select('*').eq('id', currentOrderId).single();
+        if (data) updateInterfaceWithCaptain(data);
+    }
+
+    // ===== نظام المحادثة =====
+
+    function formatTime(ts) {
+        const d = new Date(ts);
+        return `${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+
+    function appendMessage(msg) {
+        const box = document.getElementById('chatMessages');
+        const noMsgs = document.getElementById('noMsgs');
+        if (noMsgs) noMsgs.remove();
+
+        const isMe = msg.sender_role === 'client';
+        const div = document.createElement('div');
+        div.className = `msg ${isMe ? 'me' : 'them'}`;
+        div.innerHTML = `${msg.message}<div class="time">${formatTime(msg.created_at)}</div>`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+
+        if (msg.id > lastMsgId) lastMsgId = msg.id;
+    }
+
+    async function loadOldMessages() {
+        const { data } = await supabaseClient
+            .from('chat_messages')
+            .select('*')
+            .eq('order_id', currentOrderId)
+            .order('created_at', { ascending: true });
+        if (data && data.length > 0) {
+            data.forEach(appendMessage);
+        }
+    }
+
+    function startChatListener() {
+        loadOldMessages();
+        // استماع للرسائل الجديدة من المندوب
+        supabaseClient
+            .channel('chat-client-' + currentOrderId)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'chat_messages',
+                filter: `order_id=eq.${currentOrderId}`
+            }, (payload) => {
+                if (payload.new.id !== lastMsgId) {
+                    appendMessage(payload.new);
+                }
+            })
+            .subscribe();
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('chatInput');
+        const text = input.value.trim();
+        if (!text || !currentOrderId) return;
+        input.value = '';
+
+        const { error } = await supabaseClient.from('chat_messages').insert([{
+            order_id: currentOrderId,
+            sender_role: 'client',
+            sender_name: localStorage.getItem('client_name') || 'الزبون',
+            message: text
+        }]);
+
+        if (error) {
+            console.error('خطأ في إرسال الرسالة:', error);
+            input.value = text; // أعد النص لو فشل
+        }
+    }
+
+    // ===== إرسال الطلب =====
+    document.getElementById('orderForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        if (!pickupCoords || !dropoffCoords) { alert("حدد المواقع على الخريطة!"); return; }
+        document.getElementById('submitBtn').disabled = true;
+
+        const { data, error } = await supabaseClient.from('deliveries').insert([{
+            item_details: document.getElementById('itemDetails').value,
+            pickup_location: `إحداثيات: ${pickupCoords[0].toFixed(4)}, ${pickupCoords[1].toFixed(4)}`,
+            dropoff_location: `إحداثيات: ${dropoffCoords[0].toFixed(4)}, ${dropoffCoords[1].toFixed(4)}`,
+            distance: calculatedDistance, price: calculatedPrice,
+            client_name: localStorage.getItem('client_name'),
+            client_phone: localStorage.getItem('client_phone'),
+            status: 'قيد الانتظار'
+        }]).select();
+
+        if (error) {
+            alert('حدث خطأ أثناء الإرسال');
+            document.getElementById('submitBtn').disabled = false;
+        } else {
+            currentOrderId = data[0].id;
+            document.getElementById('orderBox').style.display = 'none';
+            document.getElementById('statusBox').style.display = 'block';
+
+            backupCheckerInterval = setInterval(checkStatusDirectly, 2000);
+
+            supabaseClient
+                .channel('track-order-channel')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'deliveries' }, (payload) => {
+                    if (payload.new && payload.new.id === currentOrderId) {
+                        updateInterfaceWithCaptain(payload.new);
+                    }
+                })
+                .subscribe();
+        }
+    });
+</script>
 </body>
 </html>
