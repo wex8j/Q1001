@@ -3,204 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>طلب توصيل - يلا نروح</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght=400;600;700&display=swap" rel="stylesheet">
+    <title>يلا نروح - الزبون</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
     <style>
-        body { font-family: 'Cairo', sans-serif; background-color: #f8fafc; margin: 0; padding: 15px; direction: rtl; }
-        .container { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 450px; margin: 0 auto; }
-        h2 { text-align: center; color: #4f46e5; font-weight: 700; font-size: 24px; margin-bottom: 20px; }
-        .login-box { display: block; }
-        .order-box { display: none; }
-        .status-box { display: none; background: #fafafa; border: 2px dashed #4f46e5; padding: 15px; border-radius: 15px; margin-top: 15px; text-align: center; }
-        label { font-weight: 600; color: #334155; display: block; margin-bottom: 8px; font-size: 14px; }
-        input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1.5px solid #e2e8f0; border-radius: 12px; box-sizing: border-box; font-family: 'Cairo'; font-size: 14px; }
-        #map { height: 200px; border-radius: 12px; margin-bottom: 15px; border: 1.5px solid #e2e8f0; }
-        .info-box { background: #f1f5f9; padding: 12px; border-radius: 12px; margin-bottom: 15px; text-align: center; font-weight: bold; color: #1e293b; font-size: 14px; display: none; }
-        button { width: 100%; padding: 14px; background: #4f46e5; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: 'Cairo'; }
-        .captain-info-card { background: #ecfdf5; border: 1px solid #10b981; border-radius: 12px; padding: 15px; margin-top: 15px; text-align: right; }
-        .captain-info-card h4 { margin: 0 0 10px 0; color: #065f46; }
-        .status-text { font-size: 18px; font-weight: bold; color: #4f46e5; }
-        
-        /* صندوق كشف الأخطاء السري */
-        .debug-panel { background: #fef2f2; border: 2px solid #ef4444; color: #991b1b; padding: 15px; border-radius: 12px; margin-top: 20px; font-size: 12px; text-align: left; direction: ltr; font-family: monospace; overflow-x: auto; }
+        body { font-family: sans-serif; background: #f8fafc; padding: 20px; }
+        .container { max-width: 450px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .chat-box { border-top: 1px solid #ddd; margin-top: 20px; padding-top: 10px; }
+        #chatMessages { height: 150px; overflow-y: scroll; border: 1px solid #eee; margin-bottom: 10px; padding: 5px; }
     </style>
 </head>
 <body>
-
     <div class="container">
-        <div id="loginBox" class="login-box">
-            <h2>تسجيل سريع 📝</h2>
-            <label>الاسم الكامل</label><input type="text" id="clientName" placeholder="اكتب اسمك هنا">
-            <label>رقم الهاتف</label><input type="tel" id="clientPhone" placeholder="07XXXXXXXXX">
-            <button onclick="saveClientLogin()">دخول للموقع</button>
-        </div>
-
-        <div id="orderBox" class="order-box">
-            <h2>طلب مندوب توصيل 📦</h2>
-            <form id="orderForm">
-                <label>شنو الغرض المُراد توصيله?</label><input type="text" id="itemDetails" placeholder="مثال: أوراق, هدايا..." required>
-                <label>حدد موقع الاستلام والتسليم على الخريطة:</label>
-                <div style="font-size: 12px; color: #64748b; margin-bottom: 10px;" id="mapHint">📍 اضغط على الخريطة لتحديد (مكان الاستلام)</div>
-                <div id="map"></div>
-                <div class="info-box" id="priceBox">المسافة: <span id="distanceLabel">0</span> كم | الكروة: <span id="priceLabel">0</span> د.ع</div>
-                <button type="submit" id="submitBtn">تأكيد وأرسل للمناديب ⚡</button>
-            </form>
-        </div>
-
-        <div id="statusBox" class="status-box">
-            <p class="status-text" id="statusMessage">🔄 جاري البحث عن أقرب مندوب بدراجة...</p>
-            <div id="captainDetails"></div>
-        </div>
-
-        <div class="debug-panel">
-            <div style="font-weight: bold; margin-bottom: 5px; text-align: right; direction: rtl;">🛠️ تقرير الاتصال بالسيرفر (Debug):</div>
-            <div id="debugStatus">الوضع: مستعد لإرسال الطلب الأول...</div>
+        <h2>حالة طلبك 📦</h2>
+        <div id="statusArea"></div>
+        
+        <div id="chatBox" class="chat-box" style="display:none;">
+            <h4>محادثة المندوب:</h4>
+            <div id="chatMessages"></div>
+            <input type="text" id="msgInput" style="width:70%">
+            <button onclick="sendMsg()">إرسال</button>
         </div>
     </div>
 
     <script>
-        const supabaseUrl = 'https://swblfuyivvsrjulztyff.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN3YmxmdXlpdnZzcmp1bHp0eWZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0OTQ4NTMsImV4cCI6MjA5NjA3MDg1M30.B_2lxLiEdIWSUGPlLblmi6ob8zBBAIwiOjl1Yb6RhLs';
-        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+        const supabase = supabase.createClient('YOUR_URL', 'YOUR_KEY');
+        let currentOrderId = localStorage.getItem('last_order_id');
 
-        let map, pickupCoords = null, dropoffCoords = null, pickupMarker, dropoffMarker;
-        let calculatedDistance = 0, calculatedPrice = 0, currentOrderId = null;
-        let statusInterval = null;
-
-        function logDebug(msg) {
-            document.getElementById('debugStatus').innerHTML += "<br>⏱️ " + new Date().toLocaleTimeString() + " -> " + msg;
+        // دالة إرسال الرسالة
+        async function sendMsg() {
+            const msg = document.getElementById('msgInput').value;
+            await supabase.from('messages').insert({ order_id: currentOrderId, sender: 'Client', message: msg });
+            document.getElementById('msgInput').value = '';
         }
 
-        window.onload = function() {
-            if (localStorage.getItem('client_logged') === 'true') { showOrderInterface(); }
-        }
-
-        function saveClientLogin() {
-            const name = document.getElementById('clientName').value.trim();
-            const phone = document.getElementById('clientPhone').value.trim();
-            if(!name || !phone) { alert("الرجاء كتابة الاسم والرقم!"); return; }
-            localStorage.setItem('client_name', name);
-            localStorage.setItem('client_phone', phone);
-            localStorage.setItem('client_logged', 'true');
-            showOrderInterface();
-        }
-
-        function showOrderInterface() {
-            document.getElementById('loginBox').style.display = 'none';
-            document.getElementById('orderBox').style.display = 'block';
-            map = L.map('map').setView([33.4208, 43.3022], 13); 
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-            map.on('click', function(e) {
-                const lat = e.latlng.lat;
-                const lng = e.latlng.lng;
-                if (!pickupCoords) {
-                    pickupCoords = [lat, lng];
-                    pickupMarker = L.marker(pickupCoords).addTo(map).bindPopup("📍 مكان الاستلام").openPopup();
-                    document.getElementById('mapHint').innerText = "🏁 الآن اضغط لتحديد (مكان التوصيل)";
-                } else if (!dropoffCoords) {
-                    dropoffCoords = [lat, lng];
-                    dropoffMarker = L.marker(dropoffCoords).addTo(map).bindPopup("🏁 مكان التوصيل").openPopup();
-                    document.getElementById('mapHint').innerText = "✅ تم تحديد المواقع!";
-                    calculateRoute();
-                }
-            });
-        }
-
-        function calculateRoute() {
-            const lat1 = pickupCoords[0], lon1 = pickupCoords[1];
-            const lat2 = dropoffCoords[0], lon2 = dropoffCoords[1];
-            const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            calculatedDistance = (R * c).toFixed(1);
-            calculatedPrice = calculatedDistance <= 3 ? 3000 : (calculatedDistance <= 7 ? 5000 : 7000);
-            document.getElementById('distanceLabel').innerText = calculatedDistance;
-            document.getElementById('priceLabel').innerText = calculatedPrice.toLocaleString();
-            document.getElementById('priceBox').style.display = 'block';
-        }
-
-        async function checkOrderStatus() {
-            if (!currentOrderId) return;
-            
-            const response = await supabaseClient
-                .from('deliveries')
-                .select('*')
-                .eq('id', currentOrderId);
-
-            if (response.error) {
-                logDebug("Error during Polling: " + response.error.message);
-                return;
-            }
-
-            if (response.data && response.data.length > 0) {
-                const order = response.data[0];
-                logDebug("Current Status on DB: " + order.status);
-                
-                if (order.status && order.status !== 'قيد الانتظار') {
-                    clearInterval(statusInterval); 
-                    document.getElementById('statusMessage').innerHTML = "✅ تم قبول طلبك بنجاح!";
-                    document.getElementById('captainDetails').innerHTML = `
-                        <div class="captain-info-card">
-                            <h4>🏍️ معلومات المندوب المتجه إليك:</h4>
-                            <p><strong>👤 الاسم:</strong> ${order.captain_name || 'كابتن يلا نروح'}</p>
-                            <p><strong>📞 الهاتف:</strong> <a href="tel:${order.captain_phone}">${order.captain_phone || 'غير متوفر'}</a></p>
-                            <p><strong>🛵 دراجة نوع:</strong> ${order.captain_bike || 'متوفرة'}</p>
-                        </div>
-                    `;
-                }
-            }
-        }
-
-        document.getElementById('orderForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            if (!pickupCoords || !dropoffCoords) { alert("حدد المواقع على الخريطة!"); return; }
-            document.getElementById('submitBtn').disabled = true;
-
-            logDebug("Sending request to Supabase...");
-
-            const insertResponse = await supabaseClient.from('deliveries').insert([
-                { 
-                    item_details: document.getElementById('itemDetails').value, 
-                    pickup_location: 'إحداثيات: ' + pickupCoords[0].toFixed(4) + ', ' + pickupCoords[1].toFixed(4), 
-                    dropoff_location: 'إحداثيات: ' + dropoffCoords[0].toFixed(4) + ', ' + dropoffCoords[1].toFixed(4),
-                    distance: calculatedDistance, price: calculatedPrice,
-                    client_name: localStorage.getItem('client_name'), client_phone: localStorage.getItem('client_phone'),
-                    status: 'قيد الانتظار'
-                }
-            ]).select();
-
-            // فحص الخطأ بالتفصيل الممل
-            if (insertResponse.error) {
-                logDebug("🚨 CRITICAL ERROR: " + insertResponse.error.message);
-                alert('فشل الاتصال: ' + insertResponse.error.message);
-                document.getElementById('submitBtn').disabled = false;
-                return;
-            }
-
-            if (!insertResponse.data || insertResponse.data.length === 0) {
-                logDebug("🚨 Server returned empty data (No Row Created!)");
-                alert('لم يتم إنشاء طلب بالسيرفر! تأكد من صلاحيات الـ RLS');
-                document.getElementById('submitBtn').disabled = false;
-                return;
-            }
-
-            const savedOrder = insertResponse.data[0];
-            currentOrderId = savedOrder.id || savedOrder.Id; 
-            
-            logDebug("🚀 SUCCESS! Order ID created: " + currentOrderId);
-            
-            document.getElementById('orderBox').style.display = 'none';
-            document.getElementById('statusBox').style.display = 'block';
-            
-            statusInterval = setInterval(checkOrderStatus, 2000);
-        });
+        // تحديث الرسائل لحظياً
+        supabase.channel('room').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+            document.getElementById('chatMessages').innerHTML += `<div>${payload.new.sender}: ${payload.new.message}</div>`;
+        }).subscribe();
     </script>
 </body>
 </html>
